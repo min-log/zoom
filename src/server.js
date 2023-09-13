@@ -1,8 +1,8 @@
 import http from "http";
 //import WebSocket from "ws";
 import SocketIo from "socket.io";
+import { instrument } from "@socket.io/admin-ui";
 import express from "express";
-import { Socket } from "dgram";
 
 const app = express();
 app.set("view engine","pug");
@@ -17,7 +17,19 @@ app.get("/*", (req, res) => res.redirect("/"));
 const handleListen = () => console.log('Listening on http://localhost:3000 or ws://localhost:3000');
 // 두개가 꼭 필요한 사항은 아니고 한 포트에 두개가 존재 하려면 아래와 같이 작성.
 const httpServer = http.createServer(app); // http서버
-const ioServer = SocketIo(httpServer); // SocketIo 서버
+//const ioServer = SocketIo(httpServer); // SocketIo 서버
+const ioServer = SocketIo(httpServer, {
+	cors: {
+		origin: ["https://admin.socket.io"],
+		credentials: true
+	}
+});
+instrument(ioServer, {
+	auth: false,
+});
+
+
+
  
 
 
@@ -72,7 +84,7 @@ ioServer.on("connection", (socket) =>{
 	//2. 방 나갈때 실행
 	socket.on("disconnecting",()=>{	
 		socket.rooms.forEach((room)=>{
-			socket.to(room).emit("bye", socket.nickname, countRoom(room) - 1);
+			socket.to(room).emit("bye", socket.nickname, countRoom(room) -1);
 		});
 	});
 
