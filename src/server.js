@@ -20,6 +20,31 @@ const httpServer = http.createServer(app); // http서버
 const ioServer = SocketIo(httpServer); // SocketIo 서버
  
 
+
+// 룸 리스트
+function publicRooms(){
+	const { 
+		sockets: { 
+			adapter: {sids,rooms} 
+		} 
+	} = ioServer;
+
+	const publicRooms = [];
+	rooms.forEach((_,key)=>{
+		if (sids.get(key) === undefined){
+			publicRooms.push(key)
+		}
+	})
+	return publicRooms;
+}
+
+
+// 방안에 몇명이 있는지 
+function countRoom(roomName){
+	return ioServer.sockets.adapter.rooms.get(roomName)?.size;
+
+}
+
 ioServer.on("connection", (socket) =>{
 	socket["nickname"] = "Anon";
 	console.log(socket);
@@ -37,15 +62,25 @@ ioServer.on("connection", (socket) =>{
 			// 다시 전달해주고 싶은 데이터를 넣어 전송도 가능하다. 
 		done(); 
 		//3) 처음 입장시 방안의 모두에게 입장 메시지 전달
-		socket.to(roomName).emit("welcome",socket.nickname);
+		socket.to(roomName).emit("welcome", socket.nickname, countRoom(roomName));
+
+		//4) 알림기능 - 모든 채팅방에 새로운 방이 생성됨을 알림
+		ioServer.sockets.emit("room_change", publicRooms());
+
 	});
 
-	//2. 방 나갈때  
+	//2. 방 나갈때 실행
 	socket.on("disconnecting",()=>{	
 		socket.rooms.forEach((room)=>{
-			socket.to(room).emit("bye",socket.nickname);
-		})
+			socket.to(room).emit("bye", socket.nickname, countRoom(room) - 1);
+		});
 	});
+
+	//2-1. 방을 나간후 실행
+	socket.on("disconnect", () => {	
+		//4) 알림기능 - 채팅방 내부의 모든 사용자가 나갔을 경우, 채팅방이 사라짐
+		ioServer.sockets.emit("room_change", publicRooms());
+	})
 
 	//3. 메시지
 	socket.on("new_message",(msg,room,done)=>{
